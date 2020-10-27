@@ -77,7 +77,7 @@ def train(rank, args, shared_model):
             entropy = -(log_prob * prob).sum(1)
             entropies.append(entropy)
 
-            action = prob.multinomial().data
+            action = prob.multinomial(num_samples=1).data
             log_prob = log_prob.gather(1, Variable(action))
 
             action = action.numpy()[0, 0]
