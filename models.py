@@ -43,7 +43,7 @@ class A3C_LSTM_GA(torch.nn.Module):
         self.gru_hidden_size = 256
         self.input_size = args.input_size
         self.embedding = nn.Embedding(self.input_size, 32)
-        self.gru = nn.GRU(32, self.gru_hidden_size)
+        self.gru = nn.GRUCell(32, self.gru_hidden_size)
 
         # Gated-Attention layers
         self.attn_linear = nn.Linear(self.gru_hidden_size, 64)
@@ -82,14 +82,15 @@ class A3C_LSTM_GA(torch.nn.Module):
         x_image_rep = F.relu(self.conv3(x))
 
         # Get the instruction representation
-        encoder_hidden = Variable(torch.zeros(1, 1, self.gru_hidden_size))
+        encoder_hidden = torch.zeros(1, self.gru_hidden_size)  # seq_len=1
         for i in range(input_inst.data.size(1)):
             word_embedding = self.embedding(input_inst[0, i]).unsqueeze(0)
-            _, encoder_hidden = self.gru(word_embedding, encoder_hidden)
-        x_instr_rep = encoder_hidden.view(encoder_hidden.size(1), -1)
-
+            #print(word_embedding.shape)  # [1, 32]
+            encoder_hidden = self.gru(word_embedding, encoder_hidden)
+        x_instr_rep = encoder_hidden.view(-1, encoder_hidden.size(1))
+        #print(x_instr_rep.shape)
         # Get the attention vector from the instruction representation
-        x_attention = F.sigmoid(self.attn_linear(x_instr_rep))
+        x_attention = torch.sigmoid(self.attn_linear(x_instr_rep))
 
         # Gated-Attention
         x_attention = x_attention.unsqueeze(2).unsqueeze(3)
