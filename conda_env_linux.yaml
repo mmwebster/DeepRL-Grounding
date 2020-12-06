@@ -1,40 +1,131 @@
-name: cs285-proj-v2
+name: cs285-v2
 channels:
   - pytorch
+  - conda-forge
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=main
+  - argon2-cffi=20.1.0=py36h8c4c3a4_2
+  - async_generator=1.10=py_0
+  - attrs=20.2.0=pyh9f0ad1d_0
+  - backports=1.0=py_2
+  - backports.functools_lru_cache=1.6.1=py_0
   - blas=1.0=mkl
+  - bleach=3.2.1=pyh9f0ad1d_0
+  - brotlipy=0.7.0=py36h7b6447c_1000
   - ca-certificates=2020.10.14=0
-  - certifi=2019.11.28=py27_0
-  - cffi=1.13.2=py27h2e261b9_0
+  - certifi=2020.6.20=pyhd3eb1b0_3
+  - cffi=1.11.5=py36_0
+  - chardet=3.0.4=py36_1003
+  - cryptography=3.1.1=py36h1ba5d50_0
+  - cudatoolkit=11.0.221=h6bb024c_0
+  - dataclasses=0.7=py36_0
+  - decorator=4.4.2=py_0
+  - defusedxml=0.6.0=py_0
+  - entrypoints=0.3=py36h9f0ad1d_1002
+  - idna=2.10=py_0
+  - importlib-metadata=2.0.0=py_1
+  - importlib_metadata=2.0.0=1
   - intel-openmp=2020.2=254
+  - ipykernel=5.3.4=py36hac0dd68_1
+  - ipython=5.8.0=py36_1
+  - ipython_genutils=0.2.0=py_1
+  - jinja2=2.11.2=pyh9f0ad1d_0
+  - jsonschema=3.2.0=py_2
+  - jupyter_client=6.1.7=py_0
+  - jupyter_core=4.6.3=py36h9f0ad1d_2
+  - jupyterlab_pygments=0.1.2=pyh9f0ad1d_0
+  - ld_impl_linux-64=2.33.1=h53a641e_7
   - libedit=3.1.20191231=h14c3975_1
-  - libffi=3.2.1=hf484d3e_1007
+  - libffi=3.3=he6710b0_2
   - libgcc-ng=9.1.0=hdf63c60_0
-  - libgfortran-ng=7.3.0=hdf63c60_0
+  - libsodium=1.0.18=h516909a_1
   - libstdcxx-ng=9.1.0=hdf63c60_0
+  - libuv=1.40.0=h7b6447c_0
+  - markupsafe=1.1.1=py36he6145b8_2
+  - mistune=0.8.4=py36h8c4c3a4_1002
   - mkl=2020.2=256
-  - mkl-service=2.3.0=py27he904b0f_0
-  - mkl_fft=1.0.15=py27ha843d7b_0
-  - mkl_random=1.1.0=py27hd6b4f25_0
+  - mkl-service=2.3.0=py36he904b0f_0
+  - mkl_fft=1.2.0=py36h23d657b_0
+  - mkl_random=1.1.1=py36h0573a6f_0
+  - nbclient=0.5.1=py_0
+  - nbconvert=6.0.7=py36h9f0ad1d_1
+  - nbformat=5.0.8=py_0
   - ncurses=6.2=he6710b0_1
-  - ninja=1.9.0=py27hfd86e86_0
-  - numpy=1.16.6=py27hbc911f0_0
-  - numpy-base=1.16.6=py27hde5b4d6_0
-  - openssl=1.1.1h=h7b6447c_0
-  - pip=19.3.1=py27_0
-  - pycparser=2.20=py_2
-  - python=2.7.15=h9bab390_6
-  - pytorch=0.4.1=py27__9.0.176_7.1.2_2
-  - readline=7.0=h7b6447c_5
-  - setuptools=44.0.0=py27_0
-  - six=1.15.0=py_0
+  - nest-asyncio=1.4.1=py_0
+  - ninja=1.10.1=py36hfd86e86_0
+  - notebook=6.1.4=py36h9f0ad1d_1
+  - numpy=1.19.2=py36h54aff64_0
+  - numpy-base=1.19.2=py36hfa32c7d_0
+  - openssl=1.1.1h=h516909a_0
+  - packaging=20.4=pyh9f0ad1d_0
+  - pandoc=2.11.0.4=hd18ef5c_0
+  - pandocfilters=1.4.2=py_1
+  - pexpect=4.8.0=pyh9f0ad1d_2
+  - pickleshare=0.7.5=py_1003
+  - pip=20.2.2=py36_0
+  - prometheus_client=0.8.0=pyh9f0ad1d_0
+  - prompt_toolkit=1.0.15=py_1
+  - ptyprocess=0.6.0=py_1001
+  - pycparser=2.20=pyh9f0ad1d_2
+  - pygments=2.7.2=py_0
+  - pyopenssl=19.1.0=py_1
+  - pyparsing=2.4.7=pyh9f0ad1d_0
+  - pyrsistent=0.17.3=py36h8c4c3a4_1
+  - pysocks=1.7.1=py36_0
+  - python=3.6.12=hcff3b4d_2
+  - python-dateutil=2.8.1=py_0
+  - python_abi=3.6=1_cp36m
+  - pytorch=1.7.0=py3.6_cuda11.0.221_cudnn8.0.3_0
+  - pyzmq=19.0.2=py36h9947dbf_2
+  - readline=8.0=h7b6447c_0
+  - requests=2.24.0=py_0
+  - send2trash=1.5.0=py_0
+  - setuptools=49.6.0=py36_0
+  - simplegeneric=0.8.1=py_1
+  - six=1.15.0=pyh9f0ad1d_0
   - sqlite=3.33.0=h62c20be_0
+  - terminado=0.9.1=py36h9f0ad1d_1
+  - testpath=0.4.4=py_0
   - tk=8.6.10=hbc83047_0
+  - torchtext=0.8.0=py36
+  - tornado=6.0.4=py36h8c4c3a4_2
+  - tqdm=4.50.2=py_0
+  - traitlets=4.3.3=py36h9f0ad1d_1
+  - typing_extensions=3.7.4.3=py_0
+  - urllib3=1.25.11=py_0
+  - wcwidth=0.2.5=pyh9f0ad1d_2
+  - webencodings=0.5.1=py_1
   - wheel=0.35.1=py_0
+  - xz=5.2.5=h7b6447c_0
+  - zeromq=4.3.3=he1b5a44_2
+  - zipp=3.4.0=py_0
   - zlib=1.2.11=h7b6447c_3
   - pip:
-    - opencv-python==4.2.0.32
+    - astor==0.8.1
+    - atari-py==0.2.6
+    - click==7.1.2
+    - configparser==5.0.1
+    - docker-pycreds==0.4.0
+    - gast==0.4.0
+    - gitdb==4.0.5
+    - gitpython==3.1.11
+    - h5py==2.10.0
+    - keras-applications==1.0.8
+    - keras-preprocessing==1.1.2
+    - networkx==2.5
+    - pathtools==0.1.2
+    - promise==2.3
+    - psutil==5.7.3
+    - pyyaml==5.3.1
+    - sentry-sdk==0.19.2
+    - shortuuid==1.0.1
+    - smmap==3.0.4
+    - subprocess32==3.5.4
+    - tensorboard==1.12.2
+    - tensorflow==1.12.0
+    - termcolor==1.1.0
     - vizdoom==1.1.7
-prefix: /home/milo_webster/miniconda3/envs/cs285-proj-v2
+    - wandb==0.10.8
+    - watchdog==0.10.3
+prefix: /home/milo_webster/miniconda3/envs/cs285-v2
