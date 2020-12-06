@@ -21,6 +21,8 @@ Project Website: https://sites.google.com/view/gated-attention
 (We recommend using [Anaconda](https://www.anaconda.com/download))
 
 ## Usage
+### Setuping up the dev environment
+If on a linux machine, just run `conda env create -f conda_env_linux.yml``
 
 ### Using the Environment
 For running a random agent:
