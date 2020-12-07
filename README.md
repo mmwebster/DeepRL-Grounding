@@ -22,6 +22,12 @@ Project Website: https://sites.google.com/view/gated-attention
 
 ## Usage
 
+### Configuring the dev environment
+conda create -n rl-lang-ground python=3.6.12
+conda activate rl-lang-ground
+conda install -c pytorch pytorch=1.6 torchtext
+pip install -r requirements.txt
+
 ### Using the Environment
 For running a random agent:
 ```
