@@ -24,6 +24,12 @@ Project Website: https://sites.google.com/view/gated-attention
 ### Setuping up the dev environment
 If on a linux machine, just run `conda env create -f conda_env_linux.yml``
 
+### Configuring the dev environment
+conda create -n rl-lang-ground python=3.6.12
+conda activate rl-lang-ground
+conda install -c pytorch pytorch=1.6 torchtext
+pip install -r requirements.txt
+
 ### Using the Environment
 For running a random agent:
 ```
