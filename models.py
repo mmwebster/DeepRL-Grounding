@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import layers
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -33,6 +34,87 @@ class A3C_LSTM_GA(torch.nn.Module):
 
     def __init__(self, args):
         super(A3C_LSTM_GA, self).__init__()
+
+        # Image Processing
+        self.conv1 = nn.Conv2d(3, 128, kernel_size=8, stride=4)
+        self.conv2 = nn.Conv2d(128, 64, kernel_size=4, stride=2)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=4, stride=2)
+
+        # Instruction Processing
+        word_embedding_dim = 32
+        self.input_size = args.input_size
+        self.embedding = nn.Embedding(self.input_size, word_embedding_dim)
+        self.lang_encoder = layers.EncoderLayer(d_embed=word_embedding_dim, n_heads=4,
+                d_ff_hidden=20, dropout={'attn-self': 0.1, 'ff': 0.1})
+
+        # Gated-Attention layers
+        self.attn_linear = nn.Linear(word_embedding_dim, 64)
+
+        # Time embedding layer, helps in stabilizing value prediction
+        self.time_emb_dim = 32
+        self.time_emb_layer = nn.Embedding(
+                args.max_episode_length+1,
+                self.time_emb_dim)
+
+        # A3C-LSTM layers
+        self.linear = nn.Linear(64 * 8 * 17, 256)
+        self.lstm = nn.LSTMCell(256, 256)
+        self.critic_linear = nn.Linear(256 + self.time_emb_dim, 1)
+        self.actor_linear = nn.Linear(256 + self.time_emb_dim, 3)
+
+        # Initializing weights
+        self.apply(weights_init)
+        self.actor_linear.weight.data = normalized_columns_initializer(
+            self.actor_linear.weight.data, 0.01)
+        self.actor_linear.bias.data.fill_(0)
+        self.critic_linear.weight.data = normalized_columns_initializer(
+            self.critic_linear.weight.data, 1.0)
+        self.critic_linear.bias.data.fill_(0)
+
+        self.lstm.bias_ih.data.fill_(0)
+        self.lstm.bias_hh.data.fill_(0)
+        self.train()
+
+    def forward(self, inputs):
+        x, input_inst, (tx, hx, cx) = inputs
+
+        # Get the image representation
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x_image_rep = F.relu(self.conv3(x))
+
+        # Get the instruction representation
+        # extract word embeddings
+        embedding_seq = self.embedding(input_inst[0, :]).unsqueeze(0).transpose(1,2)
+
+        # encode each word with self attention, follow by a feed forward
+        encoded_seq = self.lang_encoder(embedding_seq)
+
+        # average across the sequence dimension to get the final instruction representation
+        x_instr_rep = torch.mean(encoded_seq, dim=2)
+
+        # Get the attention vector from the instruction representation
+        x_attention = torch.sigmoid(self.attn_linear(x_instr_rep))
+
+        # Gated-Attention
+        x_attention = x_attention.unsqueeze(2).unsqueeze(3)
+        x_attention = x_attention.expand(1, 64, 8, 17)
+        assert x_image_rep.size() == x_attention.size()
+        x = x_image_rep*x_attention
+        x = x.view(x.size(0), -1)
+
+        # A3C-LSTM
+        x = F.relu(self.linear(x))
+        hx, cx = self.lstm(x, (hx, cx))
+        time_emb = self.time_emb_layer(tx)
+        x = torch.cat((hx, time_emb.view(-1, self.time_emb_dim)), 1)
+
+        return self.critic_linear(x), self.actor_linear(x), (hx, cx)
+
+class A3C_LSTM_GA_OLD(torch.nn.Module):
+
+    def __init__(self, args):
+        super(A3C_LSTM_GA_OLD, self).__init__()
 
         # Image Processing
         self.conv1 = nn.Conv2d(3, 128, kernel_size=8, stride=4)
