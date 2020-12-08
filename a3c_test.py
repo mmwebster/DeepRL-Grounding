@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import time
 import logging
+import wandb
 
 import env as grounding_env
 from models import A3C_LSTM_GA
@@ -12,6 +13,8 @@ from constants import *
 
 
 def test(rank, args, shared_model):
+    wandb.init(project="rl-language-grounding", config=args)
+
     torch.manual_seed(args.seed + rank)
 
     env = grounding_env.GroundingEnv(args)
@@ -93,20 +96,29 @@ def test(rank, args, shared_model):
                 accuracy = 0
             accuracy_list.append(accuracy)
             if(len(rewards_list) >= test_freq):
+                avg_reward = np.mean(rewards_list)
+                avg_acc = np.mean(accuracy_list)
+                avg_ep_len = np.mean(episode_length_list)
                 print(" ".join([
                     "Time {},".format(time.strftime("%Hh %Mm %Ss",
                                       time.gmtime(time.time() - start_time))),
-                    "Avg Reward {},".format(np.mean(rewards_list)),
-                    "Avg Accuracy {},".format(np.mean(accuracy_list)),
-                    "Avg Ep length {},".format(np.mean(episode_length_list)),
+                    "Avg Reward {},".format(avg_reward),
+                    "Avg Accuracy {},".format(avg_acc),
+                    "Avg Ep length {},".format(avg_ep_len),
                     "Best Reward {}".format(best_reward)]))
                 logging.info(" ".join([
                     "Time {},".format(time.strftime("%Hh %Mm %Ss",
                                       time.gmtime(time.time() - start_time))),
-                    "Avg Reward {},".format(np.mean(rewards_list)),
-                    "Avg Accuracy {},".format(np.mean(accuracy_list)),
-                    "Avg Ep length {},".format(np.mean(episode_length_list)),
+                    "Avg Reward {},".format(avg_reward),
+                    "Avg Accuracy {},".format(avg_acc),
+                    "Avg Ep length {},".format(avg_ep_len),
                     "Best Reward {}".format(best_reward)]))
+                wandb_log = {"hrs": (time.time() - start_time)/3600,
+                             "avg_reward": avg_reward,
+                             "avg_accuracy": avg_acc,
+                             "avg_ep_len": avg_ep_len,
+                             "best_reward": best_reward}
+                wandb.log(wandb_log)
                 if np.mean(rewards_list) >= best_reward and args.evaluate == 0:
                     torch.save(model.state_dict(),
                                args.dump_location+"model_best")
