@@ -16,6 +16,9 @@ import logging
 parser = argparse.ArgumentParser(description='Gated-Attention for Grounding')
 
 # Environment arguments
+parser.add_argument('--use_lang_enc', action='store_true',
+                    help="""Use the transformer encoder for language
+                            representation / encoding""")
 parser.add_argument('-l', '--max-episode-length', type=int, default=30,
                     help='maximum length of an episode (default: 30)')
 parser.add_argument('-d', '--difficulty', type=str, default="hard",

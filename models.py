@@ -41,14 +41,23 @@ class A3C_LSTM_GA(torch.nn.Module):
         self.conv3 = nn.Conv2d(64, 64, kernel_size=4, stride=2)
 
         # Instruction Processing
-        word_embedding_dim = 32
+        self.use_lang_enc = args.use_lang_enc
+        self.word_embedding_dim = 32
         self.input_size = args.input_size
-        self.embedding = nn.Embedding(self.input_size, word_embedding_dim)
-        self.lang_encoder = layers.EncoderLayer(d_embed=word_embedding_dim, n_heads=4,
-                d_ff_hidden=20, dropout={'attn-self': 0.1, 'ff': 0.1})
+        self.embedding = nn.Embedding(self.input_size, self.word_embedding_dim)
+        self.gated_attn_size = None
+
+        if self.use_lang_enc:
+            self.gated_attn_size = self.word_embedding_dim
+            self.lang_encoder = layers.EncoderLayer(d_embed=self.word_embedding_dim, n_heads=4,
+                    d_ff_hidden=20, dropout={'attn-self': 0.1, 'ff': 0.1})
+        else:
+            self.gru_hidden_size = 256
+            self.gated_attn_size = self.gru_hidden_size
+            self.gru = nn.GRUCell(self.word_embedding_dim, self.gru_hidden_size)
 
         # Gated-Attention layers
-        self.attn_linear = nn.Linear(word_embedding_dim, 64)
+        self.attn_linear = nn.Linear(self.gated_attn_size, 64)
 
         # Time embedding layer, helps in stabilizing value prediction
         self.time_emb_dim = 32
@@ -84,14 +93,22 @@ class A3C_LSTM_GA(torch.nn.Module):
         x_image_rep = F.relu(self.conv3(x))
 
         # Get the instruction representation
-        # extract word embeddings
-        embedding_seq = self.embedding(input_inst[0, :]).unsqueeze(0).transpose(1,2)
+        if self.use_lang_enc:
+            # extract word embeddings
+            embedding_seq = self.embedding(input_inst[0, :]).unsqueeze(0).transpose(1,2)
 
-        # encode each word with self attention, follow by a feed forward
-        encoded_seq = self.lang_encoder(embedding_seq)
+            # encode each word with self attention, follow by a feed forward
+            encoded_seq = self.lang_encoder(embedding_seq)
 
-        # average across the sequence dimension to get the final instruction representation
-        x_instr_rep = torch.mean(encoded_seq, dim=2)
+            # average across the sequence dimension to get the final instruction representation
+            x_instr_rep = torch.mean(encoded_seq, dim=2)
+        else:
+            encoder_hidden = torch.zeros(1, self.gru_hidden_size)  # seq_len=1
+            for i in range(input_inst.data.size(1)):
+                word_embedding = self.embedding(input_inst[0, i]).unsqueeze(0)
+                #print(word_embedding.shape)  # [1, 32]
+                encoder_hidden = self.gru(word_embedding, encoder_hidden)
+            x_instr_rep = encoder_hidden.view(-1, encoder_hidden.size(1))
 
         # Get the attention vector from the instruction representation
         x_attention = torch.sigmoid(self.attn_linear(x_instr_rep))
@@ -111,10 +128,10 @@ class A3C_LSTM_GA(torch.nn.Module):
 
         return self.critic_linear(x), self.actor_linear(x), (hx, cx)
 
-class A3C_LSTM_GA_OLD(torch.nn.Module):
+class A3C_LSTM_GA_OG(torch.nn.Module):
 
     def __init__(self, args):
-        super(A3C_LSTM_GA_OLD, self).__init__()
+        super(A3C_LSTM_GA_OG, self).__init__()
 
         # Image Processing
         self.conv1 = nn.Conv2d(3, 128, kernel_size=8, stride=4)
