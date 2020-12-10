@@ -40,24 +40,38 @@ class A3C_LSTM_GA(torch.nn.Module):
         self.conv2 = nn.Conv2d(128, 64, kernel_size=4, stride=2)
         self.conv3 = nn.Conv2d(64, 64, kernel_size=4, stride=2)
 
+        # dimension of state vector passed to A3C
+        self.d_state_vector = 256
+
         # Instruction Processing
+        self.use_new_fusion = args.use_new_fusion
         self.use_lang_enc = args.use_lang_enc
         self.word_embedding_dim = 32
         self.input_size = args.input_size
         self.embedding = nn.Embedding(self.input_size, self.word_embedding_dim)
         self.gated_attn_size = None
 
-        if self.use_lang_enc:
-            self.gated_attn_size = self.word_embedding_dim
-            self.lang_encoder = layers.EncoderLayer(d_embed=self.word_embedding_dim, n_heads=4,
-                    d_ff_hidden=20, dropout={'attn-self': 0.1, 'ff': 0.1})
-        else:
-            self.gru_hidden_size = 256
-            self.gated_attn_size = self.gru_hidden_size
-            self.gru = nn.GRUCell(self.word_embedding_dim, self.gru_hidden_size)
+        if not self.use_new_fusion:
+            if self.use_lang_enc:
+                self.gated_attn_size = self.word_embedding_dim
+                self.lang_encoder = layers.EncoderLayer(d_embed=self.word_embedding_dim, n_heads=4,
+                        d_ff_hidden=20, dropout={'attn-self': 0.1, 'ff': 0.1})
+            else:
+                self.gru_hidden_size = self.d_state_vector
+                self.gated_attn_size = self.gru_hidden_size
+                self.gru = nn.GRUCell(self.word_embedding_dim, self.gru_hidden_size)
 
-        # Gated-Attention layers
-        self.attn_linear = nn.Linear(self.gated_attn_size, 64)
+            # Gated-Attention layers
+            self.attn_linear = nn.Linear(self.gated_attn_size, 64)
+
+            self.linear = nn.Linear(64 * 8 * 17, 256)
+        else:
+            self.d_cnn_feat_map = 8 * 17
+            self.n_cnn_feat_maps = 64
+            self.attn = layers.MultiHeadAttentionLayer(n_heads=4,
+                    d_src=self.d_cnn_feat_map, d_tgt=self.word_embedding_dim, dropout=0.1)
+            self.linear = nn.Linear(self.d_cnn_feat_map, self.d_state_vector)
+
 
         # Time embedding layer, helps in stabilizing value prediction
         self.time_emb_dim = 32
@@ -66,7 +80,6 @@ class A3C_LSTM_GA(torch.nn.Module):
                 self.time_emb_dim)
 
         # A3C-LSTM layers
-        self.linear = nn.Linear(64 * 8 * 17, 256)
         self.lstm = nn.LSTMCell(256, 256)
         self.critic_linear = nn.Linear(256 + self.time_emb_dim, 1)
         self.actor_linear = nn.Linear(256 + self.time_emb_dim, 3)
@@ -93,32 +106,46 @@ class A3C_LSTM_GA(torch.nn.Module):
         x_image_rep = F.relu(self.conv3(x))
 
         # Get the instruction representation
-        if self.use_lang_enc:
-            # extract word embeddings
-            embedding_seq = self.embedding(input_inst[0, :]).unsqueeze(0).transpose(1,2)
+        if not self.use_new_fusion:
+            if self.use_lang_enc:
+                # extract word embeddings
+                embedding_seq = self.embedding(input_inst[0, :]).unsqueeze(0).transpose(1,2)
 
-            # encode each word with self attention, follow by a feed forward
-            encoded_seq = self.lang_encoder(embedding_seq)
+                # encode each word with self attention, follow by a feed forward
+                encoded_seq = self.lang_encoder(embedding_seq)
 
-            # average across the sequence dimension to get the final instruction representation
-            x_instr_rep = torch.mean(encoded_seq, dim=2)
+                # average across the sequence dimension to get the final instruction representation
+                x_instr_rep = torch.mean(encoded_seq, dim=2)
+            else:
+                encoder_hidden = torch.zeros(1, self.gru_hidden_size)  # seq_len=1
+                for i in range(input_inst.data.size(1)):
+                    word_embedding = self.embedding(input_inst[0, i]).unsqueeze(0)
+                    #print(word_embedding.shape)  # [1, 32]
+                    encoder_hidden = self.gru(word_embedding, encoder_hidden)
+                x_instr_rep = encoder_hidden.view(-1, encoder_hidden.size(1))
+
+            # Get the attention vector from the instruction representation
+            x_attention = torch.sigmoid(self.attn_linear(x_instr_rep))
+
+            # Gated-Attention
+            x_attention = x_attention.unsqueeze(2).unsqueeze(3)
+            x_attention = x_attention.expand(1, 64, 8, 17)
+            assert x_image_rep.size() == x_attention.size()
+            x = x_image_rep*x_attention
+            x = x.view(x.size(0), -1)
         else:
-            encoder_hidden = torch.zeros(1, self.gru_hidden_size)  # seq_len=1
-            for i in range(input_inst.data.size(1)):
-                word_embedding = self.embedding(input_inst[0, i]).unsqueeze(0)
-                #print(word_embedding.shape)  # [1, 32]
-                encoder_hidden = self.gru(word_embedding, encoder_hidden)
-            x_instr_rep = encoder_hidden.view(-1, encoder_hidden.size(1))
+            # extract word embeddings
+            instr_embedding_seq = self.embedding(input_inst[0, :]).unsqueeze(0).transpose(1,2)
 
-        # Get the attention vector from the instruction representation
-        x_attention = torch.sigmoid(self.attn_linear(x_instr_rep))
+            # collapse 2D feature maps in vectors
+            x_image_rep = x_image_rep.view(x_image_rep.size(0), self.n_cnn_feat_maps, -1)
 
-        # Gated-Attention
-        x_attention = x_attention.unsqueeze(2).unsqueeze(3)
-        x_attention = x_attention.expand(1, 64, 8, 17)
-        assert x_image_rep.size() == x_attention.size()
-        x = x_image_rep*x_attention
-        x = x.view(x.size(0), -1)
+            # fuse vision feat maps with nat lang instructions with attention module
+            x = self.attn(instr_embedding_seq.transpose(1,2), x_image_rep, x_image_rep)
+
+            # average across sequence dimension (now with size equal to the
+            # instruction length), which assumes only a single goal is expressed
+            x = torch.mean(x, dim=2)
 
         # A3C-LSTM
         x = F.relu(self.linear(x))

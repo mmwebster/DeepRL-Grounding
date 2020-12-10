@@ -66,42 +66,50 @@ class FeedForwardLayer(Layer):
 class MultiHeadAttentionLayer(Layer):
     # @param n_heads Number of attention n_heads, should evenly divide the model
     #              embedding dimension
-    # @param d_embed Dimension of element embeddings in the sequence
+    # @param d_src Feature dimension of inputs used to compute values and keys.
+    #              Is also used as the feature dimension (layer output dim) of
+    #              computed values
+    # @param d_tgt Feature dimension of inputs used to compute queries. Is also
+    #              used as the feature dimension (layer output dim) of computed
+    #              queries and keys. The final output has this same feature dimension
     # @param dropout Dropout probability, applied to final attention
     #                weights/scores
-    def __init__(self, n_heads, d_embed, dropout, name="None"):
+    def __init__(self, n_heads, d_src, d_tgt, dropout, name="None"):
         super(MultiHeadAttentionLayer, self).__init__(name)
-        self.d_embed = d_embed
-        self.d_k = d_embed // n_heads
+        self.d_src = d_src
+        self.d_tgt_= d_tgt
+        self.d_k = d_tgt // n_heads
+        self.d_v = d_src // n_heads
         self.h = n_heads
         self.dropout = dropout
 
-        self.q_linear = nn.Linear(d_embed, d_embed)
-        self.v_linear = nn.Linear(d_embed, d_embed)
-        self.k_linear = nn.Linear(d_embed, d_embed)
+        self.q_linear = nn.Linear(d_tgt, d_tgt)
+        self.v_linear = nn.Linear(d_src, d_src)
+        self.k_linear = nn.Linear(d_src, d_tgt)
         self.drop1 = nn.Dropout(self.dropout)
-        self.output_layer = nn.Linear(d_embed, d_embed)
+        self.output_layer = nn.Linear(d_src, d_src)
 
-    # @brief Forward pass on input of dimension (B, E, S)
+        # make sure heads evenly divides input's dimension so that we can
+        # just divide the output of linear transformations across each head for
+        # constant-ish compute
+        assert self.d_k * n_heads == d_tgt
+        assert self.d_v * n_heads == d_src
+
+    # @brief Forward pass on input of dimension (B, S, E)
     #        - B: Batch size
-    #        - E: Element embedding size
     #        - S: Sequence length
+    #        - E: Element embedding size
     # @param x_q Input used to compute query matrix
     # @param x_k Input used to compute key matrix
     # @param x_v Input used to compute value matrix
     # @return Self-attentive encoding with same dims (B, E, S)
     def forward(self, x_q, x_k, x_v, logger_conf=None, mask=None):
-
-        # transpose x from (B, E, S) -> (B, S, E)
-        x_k = torch.transpose(x_k, 1, 2)
-        x_q = torch.transpose(x_q, 1, 2)
-        x_v = torch.transpose(x_v, 1, 2)
         bs = x_k.size(0)
 
         # extract keys, values, and queries with lin proj, by each attention head
         k = self.k_linear(x_k).view(bs, -1, self.h, self.d_k)
         q = self.q_linear(x_q).view(bs, -1, self.h, self.d_k)
-        v = self.v_linear(x_v).view(bs, -1, self.h, self.d_k)
+        v = self.v_linear(x_v).view(bs, -1, self.h, self.d_v)
 
         # transpose to get dimensions (batch, head, seq, feats)
         k = k.transpose(1,2)
@@ -110,7 +118,7 @@ class MultiHeadAttentionLayer(Layer):
         weighted_values = self.attention(q, k, v, self.d_k, logger_conf, mask, self.drop1)
 
         # concatenate n_heads and put through final linear layer
-        concat = weighted_values.transpose(1,2).contiguous().view(bs, -1, self.d_embed)
+        concat = weighted_values.transpose(1,2).contiguous().view(bs, -1, self.d_src)
         output = torch.transpose(self.output_layer(concat), 1, 2)
 
         return output
@@ -150,7 +158,7 @@ class EncoderLayer(nn.Module):
 
         # self attention layer
         self.self_attn1 = MultiHeadAttentionLayer(self.n_heads,
-                self.d_embed, self.dropout['attn-self'], name="enc_self_attn1")
+                self.d_embed, self.d_embed, self.d_embed, self.dropout['attn-self'], name="enc_self_attn1")
         self.bn2 = nn.BatchNorm1d(self.d_embed)
 
         # feed forward layer

@@ -16,6 +16,10 @@ import logging
 parser = argparse.ArgumentParser(description='Gated-Attention for Grounding')
 
 # Environment arguments
+parser.add_argument('--use_new_fusion', action='store_true',
+                    help="""Use a modified decoder layer from the Attention Is
+                            All You Need Transformer to fuse language
+                            instructions with CNN feature maps""")
 parser.add_argument('--use_lang_enc', action='store_true',
                     help="""Use the transformer encoder for language
                             representation / encoding""")
