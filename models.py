@@ -70,8 +70,13 @@ class A3C_LSTM_GA(torch.nn.Module):
             self.n_cnn_feat_maps = 64
             self.attn = layers.MultiHeadAttentionLayer(n_heads=4,
                     d_src=self.d_cnn_feat_map, d_tgt=self.word_embedding_dim, dropout=0.1)
-            self.linear = nn.Linear(self.d_cnn_feat_map, self.d_state_vector)
 
+            self.d_gru_hidden = self.d_state_vector
+            self.gru = nn.GRUCell(self.d_cnn_feat_map, self.d_gru_hidden)
+
+            # @TODO might need full connected before recurrent reduce
+            #       dim of feat maps
+            self.linear = nn.Linear(self.d_gru_hidden, self.d_state_vector)
 
         # Time embedding layer, helps in stabilizing value prediction
         self.time_emb_dim = 32
@@ -143,9 +148,12 @@ class A3C_LSTM_GA(torch.nn.Module):
             # fuse vision feat maps with nat lang instructions with attention module
             x = self.attn(instr_embedding_seq.transpose(1,2), x_image_rep, x_image_rep)
 
-            # average across sequence dimension (now with size equal to the
-            # instruction length), which assumes only a single goal is expressed
-            x = torch.mean(x, dim=2)
+            # combine feature maps corresponding to each instruction word using the gru
+            gru_hidden = torch.zeros(1, self.d_gru_hidden)
+
+            for i in range(x.size(2)):
+                gru_hidden = self.gru(x[:,:,i], gru_hidden)
+            x = gru_hidden
 
         # A3C-LSTM
         x = F.relu(self.linear(x))
