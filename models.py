@@ -68,15 +68,17 @@ class A3C_LSTM_GA(torch.nn.Module):
         else:
             self.d_cnn_feat_map = 8 * 17
             self.n_cnn_feat_maps = 64
+
             self.attn = layers.MultiHeadAttentionLayer(n_heads=4,
                     d_src=self.d_cnn_feat_map, d_tgt=self.word_embedding_dim, dropout=0.1)
 
-            self.d_gru_hidden = self.d_state_vector
-            self.gru = nn.GRUCell(self.d_cnn_feat_map, self.d_gru_hidden)
+            self.lang_encoder = layers.EncoderLayer(d_embed=self.word_embedding_dim, n_heads=4,
+                    d_ff_hidden=100, dropout={'attn-self': 0.12, 'ff': 0.12})
 
-            # @TODO might need full connected before recurrent reduce
-            #       dim of feat maps
-            self.linear = nn.Linear(self.d_gru_hidden, self.d_state_vector)
+            self.attn_linear = nn.Linear(self.word_embedding_dim, 1)
+
+            self.linear = nn.Linear(self.d_cnn_feat_map,
+                    self.d_state_vector)
 
         # Time embedding layer, helps in stabilizing value prediction
         self.time_emb_dim = 32
@@ -139,21 +141,33 @@ class A3C_LSTM_GA(torch.nn.Module):
             x = x_image_rep*x_attention
             x = x.view(x.size(0), -1)
         else:
+            n_instr_words = input_inst[0, :].size(0)
+
             # extract word embeddings
             instr_embedding_seq = self.embedding(input_inst[0, :]).unsqueeze(0).transpose(1,2)
 
-            # collapse 2D feature maps in vectors
+            # collapse 2D feature maps into vectors
             x_image_rep = x_image_rep.view(x_image_rep.size(0), self.n_cnn_feat_maps, -1)
 
             # fuse vision feat maps with nat lang instructions with attention module
-            x = self.attn(instr_embedding_seq.transpose(1,2), x_image_rep, x_image_rep)
+            x_image_rep = self.attn(instr_embedding_seq.transpose(1,2), x_image_rep, x_image_rep)
 
-            # combine feature maps corresponding to each instruction word using the gru
-            gru_hidden = torch.zeros(1, self.d_gru_hidden)
+            # compute a compact instruction representation
+            #x_instr_rep = encoder_hidden.view(-1, encoder_hidden.size(1))
 
-            for i in range(x.size(2)):
-                gru_hidden = self.gru(x[:,:,i], gru_hidden)
-            x = gru_hidden
+            encoded_instr_seq = self.lang_encoder(instr_embedding_seq).\
+                    transpose(1,2)
+            assert encoded_instr_seq.size(2) == 32
+            instr_weight_seq = F.relu(self.attn_linear(encoded_instr_seq))
+
+            instr_weights_seq = instr_weight_seq.expand(1, n_instr_words, 8*17).\
+                    transpose(1,2)
+            assert instr_weights_seq.size() == x_image_rep.size()
+            x = x_image_rep * instr_weights_seq
+
+            # and collapse the [instruction length] number of feature maps into
+            # a single vector
+            x = x.mean(axis=2)
 
         # A3C-LSTM
         x = F.relu(self.linear(x))

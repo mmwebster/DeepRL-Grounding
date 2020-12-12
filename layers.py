@@ -158,15 +158,18 @@ class EncoderLayer(nn.Module):
 
         # self attention layer
         self.self_attn1 = MultiHeadAttentionLayer(self.n_heads,
-                self.d_embed, self.d_embed, self.d_embed, self.dropout['attn-self'], name="enc_self_attn1")
+                self.d_embed, self.d_embed, self.dropout['attn-self'],
+                name="enc_self_attn1")
         self.bn2 = nn.BatchNorm1d(self.d_embed)
 
         # feed forward layer
-        self.fc1 = FeedForwardLayer(self.d_embed, self.d_output, self.d_ff_hidden, self.dropout['ff'])
+        self.fc1 = FeedForwardLayer(self.d_embed, self.d_output,
+                self.d_ff_hidden, self.dropout['ff'])
         self.bn3 = nn.BatchNorm1d(self.d_output)
 
     def forward(self, x, x_masks=None, logger_conf=None):
-        x = self.bn2(x + self.self_attn1(x, x, x, logger_conf, mask=x_masks))
+        x_t = x.transpose(1,2)
+        x = self.bn2(x + self.self_attn1(x_t, x_t, x_t, logger_conf, mask=x_masks))
         x = self.bn3(x + self.fc1(x, logger_conf))
 
         return x
